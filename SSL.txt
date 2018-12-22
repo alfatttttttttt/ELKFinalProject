@@ -1,0 +1,1 @@
+scp /etc/pki/tls/certs/logstash-forwarder.crt root:/etc/ssl/certs/

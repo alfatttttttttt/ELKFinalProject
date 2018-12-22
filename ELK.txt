@@ -1,0 +1,106 @@
+#Firewall rule
+firewall-cmd --permanent --add-port=5044/tcp
+firewall-cmd --permanent --add-port=5601/tcp
+firewall-cmd --reload
+
+#Disable selinux
+setenforce 0
+systemctl stop firewalld
+
+#JDK8
+yum -y install java-1.8.0 wget
+
+#Elasticsearch
+rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+nano /etc/yum.repos.d/elk.repo
+
+--
+[elasticsearch-6.x]
+name=Elasticsearch repository for 6.x packages
+baseurl=https://artifacts.elastic.co/packages/6.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+--
+
+yum install -y elasticsearch
+
+--nano /etc/elasticsearch/elasticsearch.yml
+network.host: localhost
+
+--Service
+systemctl enable elasticsearch
+systemctl start elasticsearch
+
+--Fetch Indexes Log
+curl "localhost:9200/_cat/indices?v"
+
+#logstash
+--Install
+yum -y install logstash
+
+--Create SSL Certificate
+nano /etc/pki/tls/openssl.cnf
+subjectAltName = IP:
+
+cd /etc/pki/tls/
+openssl req -x509 -days 365 -batch -nodes -newkey rsa:2048 -keyout private/logstash-forwarder.key -out certs/logstash-forwarder.crt
+
+--Configure
+nano /etc/logstash/conf.d/logstash.conf
+
+--
+input {
+ beats {
+   port => 5044
+   # Set to False if you do not use SSL 
+   ssl => true
+   # Delete below linesif you do not use SSL
+   ssl_certificate => "/etc/pki/tls/certs/logstash-forwarder.crt"
+   ssl_key => "/etc/pki/tls/private/logstash-forwarder.key"
+   }
+}
+
+filter {
+if [type] == "syslog" {
+    grok {
+      match => { "message" => "%{SYSLOGLINE}" }
+    }
+
+    date {
+match => [ "timestamp", "MMM  d HH:mm:ss", "MMM dd HH:mm:ss" ]
+}
+  }
+
+}
+
+output {
+ elasticsearch {
+  hosts => localhost
+    index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+       }
+stdout {
+    codec => rubydebug
+       }
+}
+--
+
+--Logstash service 
+systemctl start logstash
+systemctl enable logstash
+
+#Kibana
+yum -y install kibana
+
+--Config
+nano /etc/kibana/kibana.yml
+
+server.host: "localhost"
+elasticsearch.url: "http://localhost:9200"
+
+--Service 
+systemctl start kibana
+systemctl enable kibana
+

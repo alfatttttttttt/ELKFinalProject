@@ -1,0 +1,48 @@
+#Case apache2 log
+apt update && apt install apache2 -y && service apache2 start
+
+#Firewall rule
+firewall-cmd --permanent --add-port=5044/tcp
+firewall-cmd --permanent --add-port=5601/tcp
+firewall-cmd --reload
+
+#Disable selinux
+set enforce 0
+systemctl stop firewalld
+ufw disable
+
+#Install
+curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-5.1.2-amd64.deb
+dpkg -i filebeat-5.1.2-amd64.deb
+
+curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-5.1.2-x86_64.rpm
+sudo rpm -vi filebeat-5.1.2-x86_64.rpm
+
+#Service
+systemctl enable filebeat
+systemctl start filebeat
+
+#Enable modules 
+--apache2
+filebeat modules enable apache2
+
+#Configure
+nano /etc/filebeat/filebeat.yml
+
+filebeat.inputs:
+- type: log
+ 
+      enabled: true
+      paths:
+
+        - /var/log/apache2/access.log
+
+output.logstash:
+  hosts: ["35.197.155.189:5044"]
+
+
+--Log
+cat /var/log/filebeat/filebeat
+
+#Starting filebeat realtime log
+filebeat -e

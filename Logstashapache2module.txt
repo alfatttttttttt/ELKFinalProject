@@ -1,0 +1,35 @@
+# INPUT HERE
+input {
+   beats {
+      port => 5044
+    }
+  }
+
+# FILTER HERE
+filter{
+    if [source]=="/var/log/apache2/error.log"
+      {
+        mutate {
+            remove_tag => [ "beats_input_codec_plain_applied" ]
+            add_tag => [ "apache_logs" ]
+        }
+    }
+    if [source]=="/var/log/apache2/access.log"
+     {
+    mutate {
+       remove_tag => [ "beats_input_codec_plain_applied" ]
+       add_tag => [ "apache_logs" ]
+      }
+    }
+ }
+
+#OUTPUT HERE
+output {
+ elasticsearch {
+  hosts => localhost
+    index => "%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+       }
+stdout {
+    codec => rubydebug
+       }
+}
